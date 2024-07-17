@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZENPen - Advanced Code Editor</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.0/ace.js"></script>
+    <style>
+        :root {
+            --primary-color: #61dafb;
+            --background-color: #1e1e1e;
+            --panel-background: #252526;
+            --header-background: #2d2d2d;
+            --text-color: #f0f0f0;
+            --border-color: #3c3c3c;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background-color: var(--header-background);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .editor-container {
+            display: flex;
+            flex: 1;
+            background-color: var(--panel-background);
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .panel-header {
+            background-color: var(--header-background);
+            padding: 5px 10px;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .editor {
+            width: 100%;
+            height: 100%;
+        }
+
+        .preview-container {
+            flex: 1;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-header {
+            background-color: var(--header-background);
+            padding: 5px 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .preview-frame {
+            flex: 1;
+            border: none;
+        }
+
+        .button {
+            background-color: var(--primary-color);
+            color: var(--background-color);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            opacity: 0.8;
+        }
+
+        .ai-assistant {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .ai-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .ai-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        .ai-assistant iframe {
+            display: none;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 768px) {
+            .editor-container {
+                flex-direction: column;
+            }
+
+            .panel {
+                height: 33.33%;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .preview-container {
+                height: 50%;
+            }
+
+            .ai-assistant {
+                bottom: 10px;
+                right: 10px;
+            }
+
+            .ai-assistant iframe {
+                width: 90vw;
+                height: 80vh;
+            }
+
+            .user-menu {
+                flex-direction: column;
+                align-items: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo">ZENPen</div>
+            <div class="user-menu">
+                <img src="https://i.pravatar.cc/100" alt="User Avatar" class="user-avatar">
+                <button class="button" hx-post="/save-project" hx-trigger="click">Save Project</button>
+                <button class="button" onclick="toggleFullscreen()">Fullscreen</button>
+            </div>
+        </header>
+        <main class="main-content">
+            <div class="editor-container">
+                <div class="panel">
+                    <div class="panel-header">
+                        <span>HTML</span>
+                        <button class="button" onclick="formatCode('html')">Format</button>
+                    </div>
+                    <div class="panel-content">
+                        <div id="html-editor" class="editor"></div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <span>CSS</span>
+                        <button class="button" onclick="formatCode('css')">Format</button>
+                    </div>
+                    <div class="panel-content">
+                        <div id="css-editor" class="editor"></div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <span>JavaScript</span>
+                        <button class="button" onclick="formatCode('javascript')">Format</button>
+                    </div>
+                    <div class="panel-content">
+                        <div id="js-editor" class="editor"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-container">
+                <div class="preview-header">Preview</div>
+                <iframe id="preview-frame" class="preview-frame"></iframe>
+            </div>
+        </main>
+    </div>
+
+    <div class="ai-assistant">
+        <button class="ai-button" onclick="toggleAIAssistant()">AI</button>
+        <iframe id="5SNO0VYH5L" loading="eager" src="https://embed.pickaxeproject.com/axe?id=ZENX_HCYZ5&mode=embed_gold&host=beta&theme=custom&opacity=100&font_header=Libre+Franklin&size_header=32&font_body=Quicksand&size_body=16&font_labels=Quicksand&size_labels=20&font_button=Quicksand&size_button=16&c_fb=040101&c_ff=01070E&c_fbd=FFFFFF&c_rb=019FEF&c_bb=FFFFFF&c_bt=000000&c_t=FFFFFF&s_ffo=100&s_rbo=100&s_bbo=100&s_f=minimalist&s_b=filled&s_t=0.5&s_to=1&s_r=3" width="350" height="600" style="border:1px solid rgba(0, 0, 0, 1);transition:.3s;border-radius:10px;" frameBorder="0"></iframe>
+    </div>
+
+    <script>
+        let htmlEditor, cssEditor, jsEditor;
+
+        function initializeEditors() {
+            htmlEditor = ace.edit("html-editor");
+            htmlEditor.setTheme("ace/theme/monokai");
+            htmlEditor.session.setMode("ace/mode/html");
+
+            cssEditor = ace.edit("css-editor");
+            cssEditor.setTheme("ace/theme/monokai");
+            cssEditor.session.setMode("ace/mode/css");
+
+            jsEditor = ace.edit("js-editor");
+            jsEditor.setTheme("ace/theme/monokai");
+            jsEditor.session.setMode("ace/mode/javascript");
+
+            // Set initial content
+            htmlEditor.setValue(`<div class="wrapper">
+  <div class="items">
+    <div class="item" tabindex="0" style="background-image: url(https://i.imgur.com/KTU2MJG.jpg)"></div>
+    <div class="item" tabindex="0" style="background-image: url(https://i.imgur.com/5MREG51.jpg)"></div>
+    <div class="item" tabindex="0" style="background-image: url(https://i.imgur.com/f8gp1Bl.jpg)"></div>
+    <div class="item" tabindex="0" style="background-image: url(https://i.imgur.com/5uTdfUO.jpg)"></div>
+  </div>
+</div>`);
+
+            cssEditor.setValue(`* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root{
+  --index: calc(1vw + 1vh);
+  --transition: cubic-bezier(.4, 0, .2, 1);
+}
+
+body {
+  background-color: #141414;
+  color: #fff;
+  font-family: sans-serif;
+}
+
+.wrapper {
+  will-change: transform;
+}
+
+.items {
+  position: absolute;
+  top: 50vh;
+  left: 50vw;
+  transform: translate(-50%, -50%);
+}
+
+.item {
+  width: calc(var(--index) * 20);
+  height: calc(var(--index) * 20);
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  position: absolute;
+  transition: transform var(--transition);
+  will-change: transform;
+  cursor: pointer;
+}
+
+.item:nth-child(1) {
+  transform: translate(-55%, -55%) rotate(-15deg);
+  z-index: 1;
+}
+
+.item:nth-child(2) {
+  transform: translate(-45%, -45%) rotate(-5deg);
+  z-index: 2;
+}
+
+.item:nth-child(3) {
+  transform: translate(-35%, -35%) rotate(5deg);
+  z-index: 3;
+}
+
+.item:nth-child(4) {
+  transform: translate(-25%, -25%) rotate(15deg);
+  z-index: 4;
+}
+
+.item:hover {
+  z-index: 5;
+  transform: translate(-50%, -50%) scale(1.1) !important;
+}
+
+@media (max-width: 768px) {
+  .item {
+    width: calc(var(--index) * 15);
+    height: calc(var(--index) * 15);
+  }
+}`);
+
+            jsEditor.setValue(`const items = document.querySelectorAll('.item');
+
+items.forEach(item => {
+  item.addEventListener('click', () => {
+    item.style.transform = \`
+      translate(-50%, -50%)
+      scale(1.5)
+      rotate(0deg)
+    \`;
+    item.style.zIndex = 6;
+  });
+
+  item.addEventListener('mouseleave', () => {
+    setTimeout(() => {
+      item.style.transform = '';
+      item.style.zIndex = '';
+    }, 500);
+  });
+});
+
+// Add touch event listeners for mobile devices
+items.forEach(item => {
+  item.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent default touch behavior
+    item.style.transform = \`
+      translate(-50%, -50%)
+      scale(1.5)
+      rotate(0deg)
+    \`;
+    item.style.zIndex = 6;
+  });
+
+  item.addEventListener('touchend', () => {
+    setTimeout(() => {
+      item.style.transform = '';
+      item.style.zIndex = '';
+    }, 500);
+  });
+});`);
+
+            // Add change listeners
+            [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+                editor.session.on('change', updatePreview);
+            });
+
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const html = htmlEditor.getValue();
+            const css = cssEditor.getValue();
+            const js = jsEditor.getValue();
+
+            const previewFrame = document.getElementById('preview-frame');
+            const previewContent = `
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>${css}</style>
+                    </head>
+                    <body>
+                        ${html}
+                        <script>${js}<\/script>
+                    </body>
+                </html>
+            `;
+
+            previewFrame.srcdoc = previewContent;
+        }
+
+        function formatCode(language) {
+            let editor;
+            switch (language) {
+                case 'html':
+                    editor = htmlEditor;
+                    break;
+                case 'css':
+                    editor = cssEditor;
+                    break;
+                case 'javascript':
+                    editor = jsEditor;
+                    break;
+            }
+            
+            if (editor) {
+                const session = editor.getSession();
+                session.setValue(js_beautify(session.getValue(), {
+                    indent_size: 2,
+                    space_in_empty_paren: true
+                }));
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        function toggleAIAssistant() {
+            const iframe = document.getElementById('5SNO0VYH5L');
+            if (iframe.style.display === 'none' || iframe.style.display === '') {
+                iframe.style.display = 'block';
+            } else {
+                iframe.style.display = 'none';
+            }
+        }
+
+        // Initialize editors when the page loads
+        window.addEventListener('load', initializeEditors);
+    </script>
+    <script src
